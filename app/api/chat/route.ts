@@ -7,6 +7,7 @@ import {
 } from 'ai';
 import { addResource, getInformation } from '@/lib/ai/tools';
 import { env } from '@/lib/env.mjs';
+import { listUserNotes } from '@/lib/documents';
 
 // A gpt-5 többször is kereshet, ezért hosszabb az időkorlát
 export const maxDuration = 60;
@@ -16,7 +17,7 @@ const SYSTEM_PROMPT = `You are "Chef", a friendly expert chef assistant for home
 
 ## Your knowledge base
 - About 85 English-language home recipes from Jeff Thompson's recipe collection (Indian, Thai, Mexican, Middle Eastern, American and other dishes, sauces, breads). Each recipe starts with a summary line: "Recipe: <title> | difficulty | time | ingredients, steps".
-- Personal notes the user asked you to remember (results with source "chat"), e.g. dietary preferences or allergies.
+- Personal notes the user asked you to remember (source "chat"). All of them are listed at the end of this prompt under "Saved notes about the user".
 The collection is small: many well-known dishes are NOT in it.
 
 ## Your tasks
@@ -29,7 +30,7 @@ The collection is small: many well-known dishes are NOT in it.
 1. For every cooking question, call getInformation first. Never answer from memory alone.
 2. The recipes are in English, so ALWAYS write the search query in English, even if the user writes in another language: turn the question into short English keywords (dish name, main ingredients, traits such as "quick", "vegetarian", "dessert").
 3. If the results are weak (similarity below ~0.4 or not on topic), search once or twice more with different English keywords. Do not search more than 3 times for one question.
-4. When recommending dishes, also search for "user dietary preferences allergies" and respect what you find (e.g. never recommend meat to a vegetarian).
+4. Always respect the saved notes about the user (listed at the end of this prompt), e.g. never recommend meat to a vegetarian. You do not need to search for them.
 5. Only use recipes that the tool returned. Never invent a recipe, an ingredient or a quantity. Always name the recipe you used by its title.
 6. If the requested dish is not in the collection, say so honestly, then offer 1-3 of the closest recipes that were found, explaining briefly why they are similar. Do not write the missing recipe from general knowledge.
 7. For substitutions and technique explanations you may add general cooking knowledge, but say clearly that it is general advice, not part of the recipe.
@@ -41,11 +42,17 @@ The collection is small: many well-known dishes are NOT in it.
 - When giving a full recipe: a one-sentence intro, the ingredients as a "- " list, then numbered steps. Keep the original quantities and units.
 - Use plain text lists only: no Markdown bold, italics, headings or tables.`;
 
+// Legfeljebb 5 keresési kör, az utolsó lépés mindig a válaszé
+const MAX_STEPS = 6;
+
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
 
   // Időmérés a teszt riporthoz: első token és teljes idő
   const startedAt = Date.now();
+
+  // A mentett jegyzetek mindig bekerülnek a promptba, így a modell nem hagyhatja ki őket
+  const notes = await listUserNotes();
   let firstTokenMs: number | null = null;
   const lastUserText =
     messages.at(-1)?.parts.find(p => p.type === 'text')?.text.slice(0, 80) ?? '';
@@ -53,8 +60,13 @@ export async function POST(req: Request) {
   const result = streamText({
     model: openai(env.CHAT_MODEL),
     messages: convertToModelMessages(messages),
-    stopWhen: stepCountIs(6),
-    system: SYSTEM_PROMPT,
+    stopWhen: stepCountIs(MAX_STEPS),
+    // Az utolsó lépésben nincs tool hívás, így mindig lesz válasz
+    prepareStep: ({ stepNumber }) =>
+      stepNumber >= MAX_STEPS - 1 ? { toolChoice: 'none' } : undefined,
+    system: `${SYSTEM_PROMPT}\n\n## Saved notes about the user\n${
+      notes.length > 0 ? notes.map(note => `- ${note}`).join('\n') : '(none yet)'
+    }`,
     tools: { addResource, getInformation },
     onChunk: ({ chunk }) => {
       if (chunk.type === 'text-delta' && firstTokenMs === null) firstTokenMs = Date.now() - startedAt;

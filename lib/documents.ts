@@ -130,6 +130,15 @@ export async function listDocuments() {
     .orderBy(desc(resources.createdAt));
 }
 
+export async function listUserNotes(): Promise<string[]> {
+  const rows = await db
+    .select({ content: resources.content })
+    .from(resources)
+    .where(and(eq(resources.source, 'chat'), eq(resources.status, 'processed')))
+    .orderBy(resources.createdAt);
+  return rows.map(row => row.content);
+}
+
 export async function deleteDocument(id: string): Promise<boolean> {
   const deleted = await db
     .delete(resources)

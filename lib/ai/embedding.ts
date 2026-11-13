@@ -5,6 +5,7 @@ import { cosineDistance, desc, gt, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { embeddings } from '@/lib/db/schema/resources';
 import { chunkDocument } from '@/lib/ai/chunking';
+import { extractRecipeMetadata, formatRecipeHeader } from '@/lib/ai/recipe-metadata';
 
 const embeddingModel = openai.embedding('text-embedding-3-small');
 
@@ -12,8 +13,14 @@ export const generateEmbeddings = async (
   value: string,
   fileName?: string,
 ): Promise<Array<{ embedding: number[]; content: string }>> => {
-  const chunks = chunkDocument(value, fileName);
+  let chunks = chunkDocument(value, fileName);
   if (chunks.length === 0) throw new Error('The document is empty, nothing to embed.');
+
+  // Receptek: összefoglaló sor (cím, nehézség, idő) a chunk elé
+  if (fileName && /\.md$/i.test(fileName)) {
+    const header = formatRecipeHeader(extractRecipeMetadata(value, fileName));
+    if (header) chunks = chunks.map(chunk => `${header}\n\n${chunk}`);
+  }
   const { embeddings } = await embedMany({
     model: embeddingModel,
     values: chunks,

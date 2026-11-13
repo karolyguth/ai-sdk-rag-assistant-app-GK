@@ -3,7 +3,7 @@
 import { useChat } from '@ai-sdk/react';
 import { getToolName, isToolUIPart } from 'ai';
 import { ChefHat, Loader2, Square } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { notifyDocumentsChanged } from '@/components/document-list';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,11 @@ export function Chat() {
 
   const busy = status === 'submitted' || status === 'streaming';
 
+  const bottomRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: 'end' });
+  }, [messages, status]);
+
   const send = (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || busy) return;
@@ -37,8 +42,8 @@ export function Chat() {
   };
 
   return (
-    <div className="flex flex-col w-full max-w-2xl py-24 mx-auto stretch">
-      <header className="mb-6 flex items-center gap-3">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <header className="mb-4 flex shrink-0 items-center gap-3">
         <ChefHat className="h-8 w-8 shrink-0" aria-hidden />
         <div>
           <h1 className="text-xl font-semibold">Recipe Assistant</h1>
@@ -49,7 +54,7 @@ export function Chat() {
       </header>
 
       {messages.length === 0 && (
-        <div className="mb-6 flex flex-wrap gap-2">
+        <div className="mb-4 flex shrink-0 flex-wrap gap-2">
           {EXAMPLE_QUESTIONS.map(q => (
             <button
               key={q}
@@ -63,19 +68,26 @@ export function Chat() {
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="flex-1 space-y-4 md:min-h-0 md:overflow-y-auto md:pr-2">
         {messages.map(m => {
           const textParts = m.parts.filter(p => p.type === 'text');
           const toolParts = m.parts.filter(isToolUIPart);
 
           return (
-            <div key={m.id} className="whitespace-pre-wrap">
+            <div
+              key={m.id}
+              className={
+                m.role === 'user'
+                  ? 'ml-auto w-fit max-w-[85%] whitespace-pre-wrap rounded-lg bg-zinc-100 px-3 py-2'
+                  : 'whitespace-pre-wrap break-words'
+              }
+            >
               <div>
-                <div className="font-bold mb-2">{m.role === 'user' ? 'You' : 'Chef'}</div>
+                <div className="mb-1 text-sm font-bold">{m.role === 'user' ? 'You' : 'Chef'}</div>
 
                 {/* Show text content naturally */}
                 {textParts.map((part, index) => (
-                  <p key={index} className="mb-2">{part.text}</p>
+                  <p key={index} className="mb-2 last:mb-0">{part.text}</p>
                 ))}
 
                 {/* Show collapsible tool details */}
@@ -124,6 +136,7 @@ export function Chat() {
             </button>
           </div>
         )}
+        <div ref={bottomRef} />
       </div>
 
       <form
@@ -131,10 +144,10 @@ export function Chat() {
           e.preventDefault();
           send(input);
         }}
-        className="fixed bottom-0 mb-8 flex w-full max-w-md gap-2"
+        className="sticky bottom-0 flex shrink-0 gap-2 bg-background pb-2 pt-3"
       >
         <input
-          className="flex-1 p-2 border border-gray-300 rounded shadow-xl disabled:bg-zinc-50"
+          className="min-w-0 flex-1 rounded border border-gray-300 p-2 shadow-sm disabled:bg-zinc-50"
           value={input}
           placeholder={busy ? 'Chef is answering…' : 'Ask about a recipe…'}
           aria-label="Your question"

@@ -44,12 +44,34 @@ The collection is small: many well-known dishes are NOT in it.
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
 
+  // Időmérés a teszt riporthoz: első token és teljes idő
+  const startedAt = Date.now();
+  let firstTokenMs: number | null = null;
+  const lastUserText =
+    messages.at(-1)?.parts.find(p => p.type === 'text')?.text.slice(0, 80) ?? '';
+
   const result = streamText({
     model: openai(env.CHAT_MODEL),
     messages: convertToModelMessages(messages),
     stopWhen: stepCountIs(6),
     system: SYSTEM_PROMPT,
     tools: { addResource, getInformation },
+    onChunk: ({ chunk }) => {
+      if (chunk.type === 'text-delta' && firstTokenMs === null) firstTokenMs = Date.now() - startedAt;
+    },
+    onFinish: ({ steps, totalUsage }) => {
+      const toolCalls = steps
+        .flatMap(step => step.toolCalls)
+        .map(call => `${call.toolName}(${JSON.stringify(call.input)})`);
+      console.info(
+        `[chat] model=${env.CHAT_MODEL} firstToken=${firstTokenMs ?? '-'}ms total=${Date.now() - startedAt}ms ` +
+          `steps=${steps.length} tokens=${totalUsage.inputTokens ?? '?'}in/${totalUsage.outputTokens ?? '?'}out ` +
+          `question="${lastUserText}" tools=[${toolCalls.join(', ')}]`,
+      );
+    },
+    onError: ({ error }) => {
+      console.error(`[chat] failed after ${Date.now() - startedAt}ms for "${lastUserText}":`, error);
+    },
   });
 
   return result.toUIMessageStreamResponse();

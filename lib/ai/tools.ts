@@ -4,12 +4,17 @@ import { createResource } from '@/lib/actions/resources';
 import { findRelevantContent } from '@/lib/ai/embedding';
 
 export const addResource = tool({
-  description: `add a resource to your knowledge base.
-    If the user provides a random piece of knowledge unprompted, use this tool without asking for confirmation.`,
+  description: `Save a personal note about the user to the knowledge base, so it can be used in later conversations.
+    Only use this tool when the user explicitly asks you to remember something
+    (e.g. "remember that...", "jegyezd meg, hogy..."), such as a dietary preference, an allergy, or their own recipe.
+    Do NOT use it for questions, for ingredients the user merely mentions,
+    or for information that came from the getInformation tool.`,
   inputSchema: z.object({
     content: z
       .string()
-      .describe('the content or resource to add to the knowledge base'),
+      .describe(
+        'the fact to remember, as a short self-contained English sentence about the user, e.g. "The user is vegetarian."',
+      ),
   }),
   execute: async ({ content }) => createResource({ content }),
 });

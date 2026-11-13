@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { notifyDocumentsChanged } from '@/components/document-list';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -37,7 +38,7 @@ function validate(file: File): string | null {
   return null;
 }
 
-export function DocumentUpload({ onUploaded }: { onUploaded?: () => void }) {
+export function DocumentUpload() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -64,8 +65,8 @@ export function DocumentUpload({ onUploaded }: { onUploaded?: () => void }) {
 
     if (succeeded > 0) {
       toast.success(`${succeeded} document${succeeded > 1 ? 's' : ''} added to the knowledge base`);
-      onUploaded?.();
     }
+    if (valid.length > 0) notifyDocumentsChanged();
     setFiles([]);
     if (inputRef.current) inputRef.current.value = '';
   };

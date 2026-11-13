@@ -4,9 +4,18 @@ import { useChat } from '@ai-sdk/react';
 import { getToolName, isToolUIPart } from 'ai';
 import { useState } from 'react';
 
+import { notifyDocumentsChanged } from '@/components/document-list';
+
 export function Chat() {
   const [input, setInput] = useState('');
-  const { messages, sendMessage } = useChat();
+  const { messages, sendMessage } = useChat({
+    // Új jegyzet mentésekor frissül a dokumentumlista
+    onFinish: ({ message }) => {
+      if (message.parts.some(p => isToolUIPart(p) && getToolName(p) === 'addResource')) {
+        notifyDocumentsChanged();
+      }
+    },
+  });
 
   return (
     <div className="flex flex-col w-full max-w-2xl py-24 mx-auto stretch">

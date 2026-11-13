@@ -20,7 +20,9 @@ export const addResource = tool({
 });
 
 export const getInformation = tool({
-  description: `get information from your knowledge base to answer questions.`,
+  description: `get information from your knowledge base to answer questions.
+    Returns the most similar entries with their title, source ("upload" = a recipe document,
+    "chat" = a note the user asked you to remember) and a similarity score between 0 and 1.`,
   inputSchema: z.object({
     question: z.string().describe('the users question'),
   }),

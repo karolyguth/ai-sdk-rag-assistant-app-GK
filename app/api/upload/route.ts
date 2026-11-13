@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { createDocument } from '@/lib/documents';
+import { createDocument, findUploadByFileName } from '@/lib/documents';
 import {
   ALLOWED_EXTENSIONS,
   MAX_FILE_BYTES,
@@ -38,6 +38,12 @@ export async function POST(req: Request) {
     }
     if (content.includes('\u0000')) {
       return jsonError(400, 'File does not look like a text file.');
+    }
+
+    // Azonos fájlnév kétszer nem tölthető fel, különben duplikált találatok lennének
+    const existing = await findUploadByFileName(fileName);
+    if (existing) {
+      return jsonError(409, `"${fileName}" is already in the knowledge base. Delete it first to upload it again.`);
     }
 
     const document = await createDocument({ content, fileName, source: 'upload' });

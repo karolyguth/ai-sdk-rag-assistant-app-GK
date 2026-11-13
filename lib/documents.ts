@@ -1,4 +1,4 @@
-import { desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -35,6 +35,15 @@ export type CreateDocumentInput = {
   source?: ResourceSource;
   title?: string;
 };
+
+export async function findUploadByFileName(fileName: string) {
+  const [row] = await db
+    .select({ id: resources.id, status: resources.status })
+    .from(resources)
+    .where(and(eq(resources.fileName, fileName), eq(resources.source, 'upload')))
+    .limit(1);
+  return row ?? null;
+}
 
 export async function createDocument(input: CreateDocumentInput) {
   const isMarkdown = input.fileName ? /\.md$/i.test(input.fileName) : false;

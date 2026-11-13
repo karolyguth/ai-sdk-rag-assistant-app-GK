@@ -4,20 +4,16 @@ import { cosineDistance, desc, gt, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { embeddings } from '@/lib/db/schema/resources';
+import { chunkDocument } from '@/lib/ai/chunking';
 
 const embeddingModel = openai.embedding('text-embedding-3-small');
 
-const generateChunks = (input: string): string[] => {
-  return input
-    .trim()
-    .split('.')
-    .filter(i => i !== '');
-};
-
 export const generateEmbeddings = async (
   value: string,
+  fileName?: string,
 ): Promise<Array<{ embedding: number[]; content: string }>> => {
-  const chunks = generateChunks(value);
+  const chunks = chunkDocument(value, fileName);
+  if (chunks.length === 0) throw new Error('The document is empty, nothing to embed.');
   const { embeddings } = await embedMany({
     model: embeddingModel,
     values: chunks,
@@ -26,7 +22,7 @@ export const generateEmbeddings = async (
 };
 
 export const generateEmbedding = async (value: string): Promise<number[]> => {
-  const input = value.replaceAll('\\n', ' ');
+  const input = value.replaceAll('\n', ' ');
   const { embedding } = await embed({
     model: embeddingModel,
     value: input,

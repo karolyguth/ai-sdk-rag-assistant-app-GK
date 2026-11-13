@@ -15,6 +15,13 @@
       "when": 1756575116874,
       "tag": "0001_gigantic_triton",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794588717262,
+      "tag": "0002_rapid_blindfold",
+      "breakpoints": true
     }
   ]
 }

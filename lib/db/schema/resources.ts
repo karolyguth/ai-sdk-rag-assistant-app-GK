@@ -1,15 +1,44 @@
 import { sql } from "drizzle-orm";
-import { text, varchar, timestamp, pgTable, vector } from "drizzle-orm/pg-core";
+import {
+  text,
+  varchar,
+  timestamp,
+  pgTable,
+  vector,
+  jsonb,
+} from "drizzle-orm/pg-core";
 import { createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
 import { nanoid } from "@/lib/utils";
+
+export const resourceSources = ["upload", "chat"] as const;
+export type ResourceSource = (typeof resourceSources)[number];
+
+// Feldolgozási állapotok: uploaded -> processing -> processed | failed
+export const resourceStatuses = [
+  "uploaded",
+  "processing",
+  "processed",
+  "failed",
+] as const;
+export type ResourceStatus = (typeof resourceStatuses)[number];
 
 export const resources = pgTable("resources", {
   id: varchar("id", { length: 191 })
     .primaryKey()
     .$defaultFn(() => nanoid()),
   content: text("content").notNull(),
+  fileName: varchar("file_name", { length: 255 }),
+  title: text("title"),
+  source: varchar("source", { length: 20, enum: resourceSources })
+    .notNull()
+    .default("upload"),
+  status: varchar("status", { length: 20, enum: resourceStatuses })
+    .notNull()
+    .default("uploaded"),
+  error: text("error"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
 
   createdAt: timestamp("created_at")
     .notNull()
@@ -23,19 +52,17 @@ export const embeddings = pgTable("embeddings", {
   id: varchar("id", { length: 191 })
     .primaryKey()
     .$defaultFn(() => nanoid()),
-  resourceId: varchar("resource_id", { length: 191 }).notNull(),
+  // Dokumentum törlésekor a chunkjai is törlődnek
+  resourceId: varchar("resource_id", { length: 191 })
+    .notNull()
+    .references(() => resources.id, { onDelete: "cascade" }),
   content: text("content").notNull(),
   embedding: vector("embedding", { dimensions: 1536 }).notNull(),
 });
 
-// Schema for resources - used to validate API requests
-export const insertResourceSchema = createSelectSchema(resources)
-  .extend({})
-  .omit({
-    id: true,
-    createdAt: true,
-    updatedAt: true,
-  });
+export const insertResourceSchema = createSelectSchema(resources).pick({
+  content: true,
+});
 
 // Type for resources - used to type API request params and within Components
 export type NewResourceParams = z.infer<typeof insertResourceSchema>;
